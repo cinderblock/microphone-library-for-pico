@@ -18,10 +18,10 @@
 // configuration
 const struct pdm_microphone_config config = {
     // GPIO pin for the PDM DAT signal
-    .gpio_data = 2,
+    .gpio_data = 13,
 
     // GPIO pin for the PDM CLK signal
-    .gpio_clk = 3,
+    .gpio_clk = 10,
 
     // PIO instance to use
     .pio = pio0,
@@ -56,6 +56,11 @@ int main( void )
     }
 
     printf("hello PDM microphone\n");
+
+    // set GP11 as output and set it high
+    gpio_init(11);
+    gpio_set_dir(11, GPIO_OUT);
+    gpio_put(11, 1);
 
     // initialize the PDM microphone
     if (pdm_microphone_init(&config) < 0) {
