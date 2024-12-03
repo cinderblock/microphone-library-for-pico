@@ -8,7 +8,7 @@
 #ifndef _PICO_PDM_MICROPHONE_H_
 #define _PICO_PDM_MICROPHONE_H_
 
-#include "hardware/pio.h"
+#include <hardware/pio.h>
 
 typedef void (*pdm_samples_ready_handler_t)(void);
 
