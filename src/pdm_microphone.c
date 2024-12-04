@@ -20,11 +20,13 @@
 
 #define PDM_DECIMATION       64
 #define PDM_RAW_BUFFER_COUNT 2
+#define SAMPLE_BUFFER_SIZE 16
+#define PDM_BUFFER_SIZE (SAMPLE_BUFFER_SIZE * PDM_DECIMATION / 8)
 
 static struct {
     struct pdm_microphone_config config;
     int dma_channel;
-    uint8_t* raw_buffer[PDM_RAW_BUFFER_COUNT];
+    uint8_t raw_buffer[PDM_RAW_BUFFER_COUNT][PDM_BUFFER_SIZE];
     volatile int raw_buffer_write_index;
     volatile int raw_buffer_read_index;
     uint raw_buffer_size;
@@ -40,20 +42,20 @@ int pdm_microphone_init(const struct pdm_microphone_config* config) {
     memset(&pdm_mic, 0x00, sizeof(pdm_mic));
     memcpy(&pdm_mic.config, config, sizeof(pdm_mic.config));
 
-    if (config->sample_buffer_size % (config->sample_rate / 1000)) {
+    if (SAMPLE_BUFFER_SIZE % (config->sample_rate / 1000)) {
         return -1;
     }
 
-    pdm_mic.raw_buffer_size = config->sample_buffer_size * (PDM_DECIMATION / 8);
+    pdm_mic.raw_buffer_size = PDM_BUFFER_SIZE;
 
-    for (int i = 0; i < PDM_RAW_BUFFER_COUNT; i++) {
-        pdm_mic.raw_buffer[i] = malloc(pdm_mic.raw_buffer_size);
-        if (pdm_mic.raw_buffer[i] == NULL) {
-            pdm_microphone_deinit();
+    // for (int i = 0; i < PDM_RAW_BUFFER_COUNT; i++) {
+    //     pdm_mic.raw_buffer[i] = malloc(pdm_mic.raw_buffer_size);
+    //     if (pdm_mic.raw_buffer[i] == NULL) {
+    //         pdm_microphone_deinit();
 
-            return -1;   
-        }
-    }
+    //         return -1;   
+    //     }
+    // }
 
     pdm_mic.dma_channel = dma_claim_unused_channel(true);
     if (pdm_mic.dma_channel < 0) {
@@ -109,11 +111,12 @@ int pdm_microphone_init(const struct pdm_microphone_config* config) {
 
 void pdm_microphone_deinit() {
     for (int i = 0; i < PDM_RAW_BUFFER_COUNT; i++) {
-        if (pdm_mic.raw_buffer[i]) {
-            free(pdm_mic.raw_buffer[i]);
+        memset(pdm_mic.raw_buffer[i], 0x00, PDM_BUFFER_SIZE);
+        // if (pdm_mic.raw_buffer[i]) {
+        //     free(pdm_mic.raw_buffer[i]);
 
-            pdm_mic.raw_buffer[i] = NULL;
-        }
+        //     pdm_mic.raw_buffer[i] = NULL;
+        // }
     }
 
     if (pdm_mic.dma_channel > -1) {
@@ -225,8 +228,8 @@ int pdm_microphone_read(int16_t* buffer, size_t samples) {
     int filter_stride = (pdm_mic.filter.Fs / 1000);
     samples = (samples / filter_stride) * filter_stride;
 
-    if (samples > pdm_mic.config.sample_buffer_size) {
-        samples = pdm_mic.config.sample_buffer_size;
+    if (samples > SAMPLE_BUFFER_SIZE) {
+        samples = SAMPLE_BUFFER_SIZE;
     }
 
     if (pdm_mic.raw_buffer_write_index == pdm_mic.raw_buffer_read_index) {
