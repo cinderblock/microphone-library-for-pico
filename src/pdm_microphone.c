@@ -127,8 +127,11 @@ void pdm_microphone_deinit() {
 }
 
 int pdm_microphone_start() {
+    //machine_i2s uses irq_add_shared_handler instead of irq_set_exclusive_handler.
+    //This doesnt spin forever when run from within the micropython context
+    irq_add_shared_handler(pdm_mic.dma_irq, pdm_dma_handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
+    //machine_i2s has irq_set_enabled after irq_add_shared_handler
     irq_set_enabled(pdm_mic.dma_irq, true);
-    irq_set_exclusive_handler(pdm_mic.dma_irq, pdm_dma_handler);
 
     if (pdm_mic.dma_irq == DMA_IRQ_0) {
         dma_channel_set_irq0_enabled(pdm_mic.dma_channel, true);
@@ -171,15 +174,18 @@ void pdm_microphone_stop() {
         false
     );
 
-    dma_channel_abort(pdm_mic.dma_channel);
-
     if (pdm_mic.dma_irq == DMA_IRQ_0) {
         dma_channel_set_irq0_enabled(pdm_mic.dma_channel, false);
     } else if (pdm_mic.dma_irq == DMA_IRQ_1) {
         dma_channel_set_irq1_enabled(pdm_mic.dma_channel, false);
     }
 
+    //machine_i2s has this after the disabling of dma channels
+    dma_channel_abort(pdm_mic.dma_channel);  // in case a transfer is in flight
+
     irq_set_enabled(pdm_mic.dma_irq, false);
+    //machine_i2s removes the handles with this
+    irq_remove_handler(pdm_mic.dma_irq, pdm_dma_handler);
 }
 
 static void pdm_dma_handler() {
